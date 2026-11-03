@@ -8,7 +8,7 @@
 set -euo pipefail
 
 me=$(basename "$0")
-version=0.2.0
+version=dev # a release stamps its tag here (scripts/dist.sh)
 
 # Config: the system file from the image, then the person's own file. A later value replaces an earlier one.
 MONKE_DOCS=/usr/share/doc/monkeyworks

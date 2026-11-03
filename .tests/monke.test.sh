@@ -45,7 +45,7 @@ logged() {
 # The command line
 expect "no command prints the usage" 0 "monke status" "$bin"
 expect "an unknown command fails" 2 "no command 'nope'" "$bin" nope
-expect "version" 0 "monke 0.2.0" "$bin" version
+expect "version" 0 "monke dev" "$bin" version
 ln -s "$bin" "$tmp/monkey"
 expect "a symlink names it" 0 "monkey status" "$tmp/monkey"
 
