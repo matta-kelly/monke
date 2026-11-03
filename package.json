@@ -1,0 +1,19 @@
+{
+  "name": "monke",
+  "description": "monke's notes: what lints them. Never published.",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.21.0",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "exports": "./schema.ts",
+  "scripts": {
+    "lint": "basis lint"
+  },
+  "devDependencies": {
+    "@mku1tra/basis": "^0.30.0",
+    "@mku1tra/it": "^0.9.0",
+    "zod": "4.6.7"
+  }
+}

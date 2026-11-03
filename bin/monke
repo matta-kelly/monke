@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# monke: the front door of Monkeyworks. Each command runs the machine's own tools, and prints each command before it
+# runs it, so you see what it does and can run it yourself.
+#
+# Each person can call it by their own name: a symlink to this file. It names itself by the name it was called by.
+set -euo pipefail
+
+me=$(basename "$0")
+version=0.0.0
+
+# Config: the system file from the image, then the person's own file. A later value replaces an earlier one.
+for file in /etc/monke/config "${XDG_CONFIG_HOME:-$HOME/.config}/monke/config"; do
+  if [ -r "$file" ]; then
+    # shellcheck source=/dev/null
+    . "$file"
+  fi
+done
+
+# Print a command, then run it.
+run() {
+  printf '+ %s\n' "$*" >&2
+  "$@"
+}
+
+usage() {
+  cat <<EOF
+$me: the front door of this machine. Each command prints the commands it runs.
+
+  $me status     what the system and apps are at, and what is staged
+  $me update     update the system and the apps
+  $me rollback   go back to the previous system
+  $me help "<question>"
+                 ask about this machine; the answer comes from its docs
+  $me init       set up a new person, step by step
+  $me version    the version of $me
+
+The docs: /usr/share/doc/monkeyworks/
+EOF
+}
+
+todo() {
+  echo "$me $1: not built yet" >&2
+  exit 1
+}
+
+cmd_status() { todo status; }
+cmd_update() { todo update; }
+cmd_rollback() { todo rollback; }
+cmd_help() { todo help; }
+cmd_init() { todo init; }
+cmd_version() { echo "$me $version"; }
+
+case "${1:-}" in
+  "" | -h | --help) usage ;;
+  status | update | rollback | help | init | version)
+    cmd=$1
+    shift
+    "cmd_$cmd" "$@"
+    ;;
+  *)
+    echo "$me: no command '$1'" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

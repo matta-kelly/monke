@@ -1,0 +1,8 @@
+# monke's config for every person on the machine. The image installs it at /etc/monke/config.
+# A person changes a value in ~/.config/monke/config, which is read after this file.
+
+# help: the model it asks. Any server with the OpenAI chat API.
+MONKE_ENDPOINT=https://api.fireworks.ai/inference/v1
+MONKE_MODEL=
+# The file that holds the API key. Each person's dotfiles write it from their vault.
+MONKE_KEY_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/monke/key"
