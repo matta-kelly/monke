@@ -18,4 +18,5 @@ install -Dm644 monke.md "$root/usr/share/doc/monkeyworks/monke.md" # beside the 
 
 tar --owner=0 --group=0 --numeric-owner -czf dist/monke.tar.gz -C "$root" .
 (cd dist && sha256sum monke.tar.gz >SHA256SUMS)
+rm -rf "$root" # only the tarball is the release; a staged copy of monke.md would be a second note
 tar -tzf dist/monke.tar.gz
