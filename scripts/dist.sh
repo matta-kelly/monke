@@ -11,6 +11,7 @@ install -Dm755 libexec/monke-model-fetch "$root/usr/libexec/monke-model-fetch"
 install -Dm644 systemd/monke-model.service "$root/usr/lib/systemd/system/monke-model.service"
 install -Dm644 -t "$root/usr/share/monke" share/monke/*.md
 install -Dm644 etc/monke/config "$root/etc/monke/config"
+install -Dm644 monke.md "$root/usr/share/doc/monkeyworks/monke.md" # beside the machine's docs, which link it and help reads
 
 tar --owner=0 --group=0 --numeric-owner -czf dist/monke.tar.gz -C "$root" .
 (cd dist && sha256sum monke.tar.gz >SHA256SUMS)

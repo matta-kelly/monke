@@ -10,7 +10,7 @@ monke: the front door of [[monkeyworks]]. A bash script that wraps the tools the
 - Names: how each person calls it by their own name
 - How the image ships it
 
-Built: every command, the config, the local model's download, the release, and the tests. Run for real: `help` on the local path, in the published image, with a tiny test model. Not yet run on a real machine.
+Built: every command, the config, the local model's download, the release, and the tests. Run on a real machine: `help` on the local path, on the E480. Not yet run for real: `help` on main, `init`.
 
 ---
 ## Commands
@@ -58,6 +58,7 @@ The image installs `/usr/bin/monke`. A person calls it by another name with a sy
 
 - a tag `v*` runs `release.yml`: `scripts/dist.sh` lays the files out at their paths under `/` in `monke.tar.gz`, with `SHA256SUMS`, and makes a GitHub release
 	- `/usr/bin/monke`, `/usr/libexec/monke-model-fetch`, `/usr/lib/systemd/system/monke-model.service`, `/usr/share/monke/`, `/etc/monke/config`
+	- this note, at `/usr/share/doc/monkeyworks/monke.md`, beside the machine's docs
 - the monkeyimage recipe's `monke` stage takes the latest release at each build and checks it against its `SHA256SUMS`, so a new tag reaches the image at the next daily build
 - the image also carries llama-server, from llama.cpp's own CPU build in its `llama.cpp` stage, and enables `monke-model.service`
 
