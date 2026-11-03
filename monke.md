@@ -9,16 +9,20 @@ monke: the front door of [[monkeyworks]]. A bash script that wraps the tools the
 - Names: how each person calls it by their own name
 - How the image ships it
 
-Built: the script, its commands as stubs that say "not built yet", the config, and the tests. Not built: every command's body, and the image stage.
+Built: every command, the config, and the tests. Not built: the image stage, and a model for `help` (`MONKE_MODEL` is empty). Not yet run on a real machine.
 
 ---
 ## Commands
 
-- `status`: what the system and the apps are at, and what update is staged
-- `update`: the system and the apps, in one step
-- `rollback`: back to the previous system
-- `help "<question>"`: one request to a model, with the docs at `/usr/share/doc/monkeyworks/` as context
-- `init`: walks a new person through their setup, step by step
+Each command prints what it runs: `+ cmd` for a command that does something, `? cmd` for a check that changes nothing.
+- `status`: `rpm-ostree status` (the booted, staged and rollback systems), the installed apps, and the app updates there are
+- `update`: `rpm-ostree upgrade`, then `flatpak update`. It says when a new system is staged for the next reboot
+- `rollback`: `rpm-ostree rollback`, so the previous system boots next. Running it again undoes it. Apps are not rolled back
+- `help "<question>"`: one request to the model, with every doc in `/usr/share/doc/monkeyworks/` as context. It answers and changes nothing. The key goes in a header from a file descriptor, never on a command line
+- `init`: the steps of setup (Each person), in order: the mesh, the vault, GitHub, the dotfiles, backup. Each step checks first and skips what is done, and asks before it changes anything
+	- the mesh is the machine's step: off the mesh, `init` stops
+	- it does not make the vault items for backup: it names the two items to make, then stops
+	- for backup it creates the repository and starts the first backup
 - `version`
 
 ## Config

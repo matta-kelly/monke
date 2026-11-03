@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 # monke: the front door of Monkeyworks. Each command runs the machine's own tools, and prints each command before it
 # runs it, so you see what it does and can run it yourself.
+#   + cmd   a command that does something
+#   ? cmd   a check: it changes nothing
 #
 # Each person can call it by their own name: a symlink to this file. It names itself by the name it was called by.
 set -euo pipefail
 
 me=$(basename "$0")
-version=0.0.0
+version=0.1.0
 
 # Config: the system file from the image, then the person's own file. A later value replaces an earlier one.
+MONKE_DOCS=/usr/share/doc/monkeyworks
+MONKE_ENDPOINT=
+MONKE_MODEL=
+MONKE_KEY_FILE=
 for file in /etc/monke/config "${XDG_CONFIG_HOME:-$HOME/.config}/monke/config"; do
   if [ -r "$file" ]; then
     # shellcheck source=/dev/null
@@ -20,6 +26,24 @@ done
 run() {
   printf '+ %s\n' "$*" >&2
   "$@"
+}
+
+# Print a check, then run it with no output. Its exit code is the answer.
+check() {
+  printf '? %s\n' "$*" >&2
+  "$@" >/dev/null 2>&1
+}
+
+die() {
+  echo "$me: $*" >&2
+  exit 1
+}
+
+# Ask a yes/no question. Enter means yes.
+ask() {
+  local answer
+  read -r -p "$1 [Y/n] " answer
+  [[ -z $answer || $answer == [yY]* ]]
 }
 
 usage() {
@@ -34,20 +58,140 @@ $me: the front door of this machine. Each command prints the commands it runs.
   $me init       set up a new person, step by step
   $me version    the version of $me
 
-The docs: /usr/share/doc/monkeyworks/
+The docs: $MONKE_DOCS
 EOF
 }
 
-todo() {
-  echo "$me $1: not built yet" >&2
-  exit 1
+# The system's deployments (booted, staged, rollback), then the apps, then the app updates there are.
+cmd_status() {
+  run rpm-ostree status
+  echo
+  run flatpak list --app --columns=application,version,installation
+  echo
+  echo "app updates:"
+  run flatpak remote-ls --updates --app --columns=application,version || echo "(none found, or offline)"
 }
 
-cmd_status() { todo status; }
-cmd_update() { todo update; }
-cmd_rollback() { todo rollback; }
-cmd_help() { todo help; }
-cmd_init() { todo init; }
+# The system first, then the apps. The new system takes over at the next reboot.
+cmd_update() {
+  run rpm-ostree upgrade
+  run flatpak update -y
+  local rc=0
+  rpm-ostree status --pending-exit-77 >/dev/null || rc=$?
+  if [ "$rc" = 77 ]; then
+    echo "A new system is staged. Reboot to use it. To go back after, run: $me rollback"
+  fi
+}
+
+# The previous system becomes the default at the next reboot. Running it again undoes it. Apps are not rolled back.
+cmd_rollback() {
+  run rpm-ostree rollback
+  echo "Reboot to use the previous system. To undo, run $me rollback again."
+}
+
+# One request to the model, with every doc as context. No agent: it answers, and changes nothing.
+cmd_help() {
+  local question="$*" docs="" file key="" body resp
+  [ -n "$question" ] || {
+    echo "usage: $me help \"<question>\"" >&2
+    exit 2
+  }
+  [ -n "$MONKE_ENDPOINT" ] || die "no MONKE_ENDPOINT: set it in ~/.config/monke/config"
+  [ -n "$MONKE_MODEL" ] || die "no MONKE_MODEL: set it in ~/.config/monke/config"
+  if [ -n "$MONKE_KEY_FILE" ]; then
+    [ -r "$MONKE_KEY_FILE" ] || die "no key at $MONKE_KEY_FILE: your dotfiles write it from your vault"
+    key=$(<"$MONKE_KEY_FILE")
+  fi
+  for file in "$MONKE_DOCS"/*.md; do
+    [ -r "$file" ] || continue
+    docs+="=== ${file##*/} ===
+$(<"$file")
+
+"
+  done
+  [ -n "$docs" ] || die "no docs in $MONKE_DOCS"
+
+  body=$(jq -n --arg model "$MONKE_MODEL" --arg me "$me" --arg docs "$docs" --arg q "$question" '{
+    model: $model,
+    messages: [
+      {role: "system", content: ("You explain this machine, Monkeyworks (Fedora Sway Atomic), to the person using it. Answer from the docs below, plainly and briefly. Give the exact commands. If the docs do not cover it, say so. The person calls the CLI `" + $me + "`.\n\n" + $docs)},
+      {role: "user", content: $q}
+    ]
+  }')
+
+  # The key goes in a header read from a file descriptor, so it is never on a command line.
+  printf '+ curl %s/chat/completions  (model %s; the question and the docs in %s; the key from %s)\n' \
+    "$MONKE_ENDPOINT" "$MONKE_MODEL" "$MONKE_DOCS" "${MONKE_KEY_FILE:-nowhere}" >&2
+  resp=$(curl -sS --fail-with-body -H "Content-Type: application/json" \
+    -H @<([ -z "$key" ] || printf 'Authorization: Bearer %s\n' "$key") \
+    --data-binary @- "$MONKE_ENDPOINT/chat/completions" <<<"$body") || die "the request failed: $resp"
+  jq -r '.choices[0].message.content' <<<"$resp"
+}
+
+# The steps of the docs' setup (Each person), in order. A step that is done is skipped. Each step asks first.
+cmd_init() {
+  local name url email repo
+  echo "Setup for $(id -un). Each step checks first, and asks before it changes anything."
+
+  echo
+  echo "== the mesh"
+  check tailscale status || die "this machine is not on the mesh. Do the machine setup first (setup, Machine)"
+
+  echo
+  echo "== the vault"
+  if ! check rbw unlocked; then
+    printf '? rbw config show\n' >&2
+    if [ -z "$(rbw config show 2>/dev/null | jq -r '.base_url // empty')" ]; then
+      read -r -p "Vaultwarden URL: " url
+      read -r -p "your vault email: " email
+      run rbw config set base_url "$url"
+      run rbw config set email "$email"
+    fi
+    ask "Log in to the vault? It asks for your master password." && run rbw login && run rbw unlock
+  fi
+
+  echo
+  echo "== GitHub"
+  if ! check gh auth status; then
+    ask "Log in to GitHub?" && run gh auth login --git-protocol https
+  fi
+
+  echo
+  echo "== your dotfiles"
+  if ! check test -d "$(chezmoi source-path 2>/dev/null)/.git"; then
+    read -r -p "your dotfiles repo (for example github.com/<you>/dotfiles): " repo
+    ask "Clone and apply $repo? It writes into your home." && run chezmoi init --apply "$repo"
+  fi
+
+  echo
+  echo "== backup"
+  local conf="${XDG_CONFIG_HOME:-$HOME/.config}/restic"
+  name=$(id -un)
+  if ! check test -r "$conf/env" -a -r "$conf/password"; then
+    cat <<EOF
+No backup config in $conf. Make these, then run $me init again:
+  - a vault item hetzner-s3-$name: notes = JSON with RESTIC_REPOSITORY, AWS_DEFAULT_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+  - a vault item restic-$name: notes = a long random password
+  - your dotfiles templates for $conf/env and $conf/password, then: chezmoi apply
+EOF
+    return
+  fi
+  # restic reads the repository and keys from the env file, and the password from its file.
+  # shellcheck source=/dev/null
+  restic_env() { (set -a && . "$conf/env" && set +a && "$@"); }
+  if ! restic_env check restic -p "$conf/password" cat config; then
+    ask "Create the backup repository?" && restic_env run restic -p "$conf/password" init
+  fi
+  printf '? restic -p %s snapshots --latest 1\n' "$conf/password" >&2
+  if ! restic_env restic -p "$conf/password" snapshots --latest 1 --json 2>/dev/null | jq -e 'length > 0' >/dev/null 2>&1; then
+    ask "Run the first backup now? It runs in the background; see it with: journalctl --user -u restic-backup -f" &&
+      run systemctl --user start --no-block restic-backup
+  fi
+
+  echo
+  echo "Done. Next: $me status. To restore a file, see backup in $MONKE_DOCS."
+}
+
 cmd_version() { echo "$me $version"; }
 
 case "${1:-}" in
