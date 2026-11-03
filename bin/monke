@@ -8,13 +8,16 @@
 set -euo pipefail
 
 me=$(basename "$0")
-version=0.1.0
+version=0.2.0
 
 # Config: the system file from the image, then the person's own file. A later value replaces an earlier one.
 MONKE_DOCS=/usr/share/doc/monkeyworks
-MONKE_ENDPOINT=
-MONKE_MODEL=
+MONKE_SHARE=/usr/share/monke
+MONKE_MAIN_PROVIDER=fireworks
+MONKE_MAIN_MODEL=
 MONKE_KEY_FILE=
+MONKE_LOCAL_MODEL=
+MONKE_LOCAL_PORT=8765
 for file in /etc/monke/config "${XDG_CONFIG_HOME:-$HOME/.config}/monke/config"; do
   if [ -r "$file" ]; then
     # shellcheck source=/dev/null
@@ -53,8 +56,8 @@ $me: the front door of this machine. Each command prints the commands it runs.
   $me status     what the system and apps are at, and what is staged
   $me update     update the system and the apps
   $me rollback   go back to the previous system
-  $me help "<question>"
-                 ask about this machine; the answer comes from its docs
+  $me help ["<question>"]
+                 a chat about this machine: local (on this laptop) or main (online)
   $me init       set up a new person, step by step
   $me version    the version of $me
 
@@ -89,43 +92,101 @@ cmd_rollback() {
   echo "Reboot to use the previous system. To undo, run $me rollback again."
 }
 
-# One request to the model, with every doc as context. No agent: it answers, and changes nothing.
+# A chat in pi about this machine, with tools off: it answers, and changes nothing.
+# Online, it asks local or main (Enter: local). Offline, it is local, and local opens with an offer to get on wifi.
 cmd_help() {
-  local question="$*" docs="" file key="" body resp
-  [ -n "$question" ] || {
-    echo "usage: $me help \"<question>\"" >&2
-    exit 2
-  }
-  [ -n "$MONKE_ENDPOINT" ] || die "no MONKE_ENDPOINT: set it in ~/.config/monke/config"
-  [ -n "$MONKE_MODEL" ] || die "no MONKE_MODEL: set it in ~/.config/monke/config"
-  if [ -n "$MONKE_KEY_FILE" ]; then
-    [ -r "$MONKE_KEY_FILE" ] || die "no key at $MONKE_KEY_FILE: your dotfiles write it from your vault"
-    key=$(<"$MONKE_KEY_FILE")
+  local state mode=local offline=no answer
+  printf '? nmcli networking connectivity\n' >&2
+  state=$(nmcli -t networking connectivity 2>/dev/null || echo unknown)
+  if [ "$state" = full ]; then
+    read -r -p "local or main? [L/m] " answer
+    [[ $answer == [mM]* ]] && mode=main
+  else
+    echo "offline ($state): using the local model"
+    offline=yes
   fi
-  for file in "$MONKE_DOCS"/*.md; do
-    [ -r "$file" ] || continue
-    docs+="=== ${file##*/} ===
-$(<"$file")
 
-"
+  tmp=$(mktemp -d)
+  trap 'cleanup' EXIT
+  if [ "$mode" = main ]; then
+    help_main "$@"
+  else
+    help_local "$offline" "$@"
+  fi
+}
+
+# Run at exit: stop the local model if help started it, and delete the prompt files.
+cleanup() {
+  if [ -n "${server_pid:-}" ]; then
+    kill "$server_pid" 2>/dev/null || true
+    wait "$server_pid" 2>/dev/null || true
+  fi
+  rm -rf "${tmp:?}"
+}
+
+# main: the person's own pi, its provider and model from the config, with every doc in the system prompt.
+help_main() {
+  local sys=$tmp/system.md file key
+  [ -n "$MONKE_MAIN_MODEL" ] || die "no MONKE_MAIN_MODEL: set it in ~/.config/monke/config"
+  {
+    cat "$MONKE_SHARE/main.md"
+    printf '\nCLI name: %s\n\n# The docs\n\n' "$me"
+    for file in "$MONKE_DOCS"/*.md; do
+      [ -r "$file" ] || continue
+      printf '=== %s ===\n%s\n\n' "${file##*/}" "$(<"$file")"
+    done
+  } >"$sys"
+  # The key goes to pi in its environment, never on a command line. With no key file, pi uses its own login.
+  if [ -n "$MONKE_KEY_FILE" ] && [ -r "$MONKE_KEY_FILE" ]; then
+    key=$(<"$MONKE_KEY_FILE")
+    echo "(key: $MONKE_KEY_FILE)" >&2
+    FIREWORKS_API_KEY=$key run pi --no-tools --provider "$MONKE_MAIN_PROVIDER" --model "$MONKE_MAIN_MODEL" \
+      --append-system-prompt "$sys" "$@"
+  else
+    run pi --no-tools --provider "$MONKE_MAIN_PROVIDER" --model "$MONKE_MAIN_MODEL" --append-system-prompt "$sys" "$@"
+  fi
+}
+
+# local: llama-server runs the model on this laptop while the chat is open, and pi talks to it through its own config,
+# which knows only this model.
+help_local() {
+  local offline=$1 sys=$tmp/system.md agent="${XDG_STATE_HOME:-$HOME/.local/state}/monke/pi-local" i
+  shift
+  if [ ! -r "$MONKE_LOCAL_MODEL" ]; then
+    echo "$me: the local model is not downloaded yet ($MONKE_LOCAL_MODEL)." >&2
+    echo "It downloads by itself once the machine is online. To get online now, run: nmtui" >&2
+    exit 1
+  fi
+
+  printf '+ llama-server -m %s --alias local --host 127.0.0.1 --port %s -c 8192\n' "$MONKE_LOCAL_MODEL" "$MONKE_LOCAL_PORT" >&2
+  llama-server -m "$MONKE_LOCAL_MODEL" --alias local --host 127.0.0.1 --port "$MONKE_LOCAL_PORT" -c 8192 \
+    >"$tmp/llama-server.log" 2>&1 &
+  server_pid=$!
+  echo "loading the local model..." >&2
+  for ((i = 0; i < 120; i++)); do
+    curl -fs "http://127.0.0.1:$MONKE_LOCAL_PORT/health" >/dev/null 2>&1 && break
+    kill -0 "$server_pid" 2>/dev/null || die "llama-server stopped: $(tail -5 "$tmp/llama-server.log")"
+    sleep 1
   done
-  [ -n "$docs" ] || die "no docs in $MONKE_DOCS"
+  [ "$i" -lt 120 ] || die "the local model did not load in 2 minutes"
 
-  body=$(jq -n --arg model "$MONKE_MODEL" --arg me "$me" --arg docs "$docs" --arg q "$question" '{
-    model: $model,
-    messages: [
-      {role: "system", content: ("You explain this machine, Monkeyworks (Fedora Sway Atomic), to the person using it. Answer from the docs below, plainly and briefly. Give the exact commands. If the docs do not cover it, say so. The person calls the CLI `" + $me + "`.\n\n" + $docs)},
-      {role: "user", content: $q}
-    ]
-  }')
-
-  # The key goes in a header read from a file descriptor, so it is never on a command line.
-  printf '+ curl %s/chat/completions  (model %s; the question and the docs in %s; the key from %s)\n' \
-    "$MONKE_ENDPOINT" "$MONKE_MODEL" "$MONKE_DOCS" "${MONKE_KEY_FILE:-nowhere}" >&2
-  resp=$(curl -sS --fail-with-body -H "Content-Type: application/json" \
-    -H @<([ -z "$key" ] || printf 'Authorization: Bearer %s\n' "$key") \
-    --data-binary @- "$MONKE_ENDPOINT/chat/completions" <<<"$body") || die "the request failed: $resp"
-  jq -r '.choices[0].message.content' <<<"$resp"
+  mkdir -p "$agent"
+  jq -n --arg url "http://127.0.0.1:$MONKE_LOCAL_PORT/v1" \
+    '{providers: {local: {baseUrl: $url, api: "openai-completions", apiKey: "none", models: [{id: "local", name: "local"}]}}}' \
+    >"$agent/models.json"
+  {
+    cat "$MONKE_SHARE/local.md"
+    printf '\nCLI name: %s\n' "$me"
+    if [ "$offline" = yes ]; then
+      echo
+      cat "$MONKE_SHARE/offline.md"
+    fi
+  } >"$sys"
+  # Offline with no question, local speaks first: it gets a first message, and opens with the wifi offer.
+  if [ "$offline" = yes ] && [ $# -eq 0 ]; then
+    set -- "I'm offline."
+  fi
+  PI_CODING_AGENT_DIR=$agent run pi --no-tools --provider local --model local --append-system-prompt "$sys" "$@"
 }
 
 # The steps of the docs' setup (Each person), in order. A step that is done is skipped. Each step asks first.

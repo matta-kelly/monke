@@ -1,0 +1,20 @@
+[Unit]
+Description=Download the local model of monke help
+Documentation=file:/usr/share/doc/monkeyworks/monkeyworks.md
+Wants=network-online.target
+After=network-online.target
+# retry every 10 minutes, with no limit, until the machine is online and the download passes its check
+StartLimitIntervalSec=0
+
+[Service]
+# exec, not oneshot: boot does not wait for a 2 GB download
+Type=exec
+ExecStart=/usr/libexec/monke-model-fetch
+StateDirectory=monke
+Restart=on-failure
+RestartSec=10min
+Nice=19
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

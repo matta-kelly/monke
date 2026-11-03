@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Downloads the local model of `monke help` into /var/lib/monke/models/, once, for every person on the machine.
+# monke-model.service runs it at boot, and again every 10 minutes until it succeeds: a machine offline at boot gets the
+# model once it is online.
+#
+# The model is pinned by its sha256. To change it: the URL, the sha256 and the file name here, and MONKE_LOCAL_MODEL in
+# etc/monke/config, together.
+set -euo pipefail
+
+url=https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf
+sha256=6c1a2b41161032677be168d354123594c0e6e67d2b9227c84f296ad037c728ff
+dir=${MONKE_MODEL_DIR:-/var/lib/monke/models}
+file=$dir/Llama-3.2-3B-Instruct-Q4_K_M.gguf
+
+if [ -e "$file" ]; then
+  echo "have $file"
+  exit 0
+fi
+mkdir -p "$dir"
+# A partial download resumes on the next try. A file that fails the check is deleted, so the next try starts clean.
+curl -fL --retry 3 -C - -o "$file.part" "$url"
+if ! echo "$sha256  $file.part" | sha256sum -c -; then
+  rm -f "$file.part"
+  exit 1
+fi
+chmod 644 "$file.part"
+mv "$file.part" "$file"
+echo "downloaded $file"

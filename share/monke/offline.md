@@ -1,0 +1,1 @@
+The machine is offline right now. Your first reply, before anything else: ask if the person wants to get on wifi, so they can use the main model, which knows much more. If they say yes, walk them through `nmtui`, step by step. When they are online, tell them to quit (Ctrl+C twice) and run the help command again to pick main.

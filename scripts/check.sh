@@ -17,7 +17,7 @@ sets="lint shellcheck test"
 # (the justfile).
 set_lint() { if command -v npm >/dev/null; then npm run --silent lint; else just lint; fi; }
 set_shellcheck() {
-  if command -v shellcheck >/dev/null; then shellcheck bin/monke scripts/check.sh .tests/monke.test.sh; else just shellcheck; fi
+  if command -v shellcheck >/dev/null; then shellcheck bin/monke libexec/monke-model-fetch scripts/*.sh .tests/*.sh; else just shellcheck; fi
 }
 set_test() { .tests/monke.test.sh; }
 
@@ -25,7 +25,7 @@ set_test() { .tests/monke.test.sh; }
 sets_for() {
   case "$1" in
     *.md) echo lint ;;
-    bin/* | etc/* | .tests/*) echo shellcheck test ;;
+    bin/* | etc/* | libexec/* | share/* | systemd/* | scripts/dist.sh | .tests/*) echo shellcheck test ;;
     *) echo all ;;
   esac
 }
