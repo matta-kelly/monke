@@ -13,6 +13,7 @@ version=dev # a release stamps its tag here (scripts/dist.sh)
 # Config: the system file from the image, then the person's own file. A later value replaces an earlier one.
 MONKE_DOCS=/usr/share/doc/monkeyworks
 MONKE_SHARE=/usr/share/monke
+MONKE_KEYS=/usr/libexec/monke-keys
 MONKE_MAIN_PROVIDER=fireworks
 MONKE_MAIN_MODEL=
 MONKE_KEY_FILE=
@@ -124,13 +125,22 @@ cleanup() {
   rm -rf "${tmp:?}"
 }
 
+# The person's sway key bindings, read from their config now, for the model's context. Nothing when they cannot be read.
+keys_section() {
+  local keys
+  keys=$("$MONKE_KEYS" 2>/dev/null) || return 0
+  printf '\n# Key bindings\n\nThe person'"'"'s sway key bindings, read from their config just now. Super is the Windows key.\n\n%s\n' "$keys"
+}
+
 # main: the person's own pi, its provider and model from the config, with every doc in the system prompt.
 help_main() {
   local sys=$tmp/system.md file key
   [ -n "$MONKE_MAIN_MODEL" ] || die "no MONKE_MAIN_MODEL: set it in ~/.config/monke/config"
   {
     cat "$MONKE_SHARE/main.md"
-    printf '\nCLI name: %s\n\n# The docs\n\n' "$me"
+    printf '\nCLI name: %s\n' "$me"
+    keys_section
+    printf '\n# The docs\n\n'
     for file in "$MONKE_DOCS"/*.md; do
       [ -r "$file" ] || continue
       printf '=== %s ===\n%s\n\n' "${file##*/}" "$(<"$file")"
@@ -177,6 +187,7 @@ help_local() {
   {
     cat "$MONKE_SHARE/local.md"
     printf '\nCLI name: %s\n' "$me"
+    keys_section
     if [ "$offline" = yes ]; then
       echo
       cat "$MONKE_SHARE/offline.md"

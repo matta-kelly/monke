@@ -1,0 +1,118 @@
+#!/usr/bin/python3
+"""Print the person's sway key bindings, one per line: the keys, then what they do.
+
+It reads the config files sway reads, the way sway layers them: the main config, then the drop-ins from
+/usr/share/sway/config.d, /etc/sway/config.d and ~/.config/sway/config.d, where a file in a later folder replaces one
+with the same name in an earlier folder. `monke help` gives its output to the model.
+"""
+
+import os
+import re
+import sys
+from pathlib import Path
+
+home = Path(os.environ.get("HOME", "~")).expanduser()
+xdg = Path(os.environ.get("XDG_CONFIG_HOME", home / ".config"))
+root = Path(os.environ.get("MONKE_SWAY_ROOT", "/"))  # tests point this at a fake filesystem
+
+
+def main_config() -> Path:
+    own = xdg / "sway" / "config"
+    return own if own.exists() else root / "etc/sway/config"
+
+
+def drop_ins() -> list[Path]:
+    layered: dict[str, Path] = {}
+    for folder in (root / "usr/share/sway/config.d", root / "etc/sway/config.d", xdg / "sway" / "config.d"):
+        for path in sorted(folder.glob("*.conf")) if folder.is_dir() else []:
+            layered[path.name] = path
+    return [layered[name] for name in sorted(layered)]
+
+
+def lines(path: Path):
+    """The config's lines, with comments dropped and backslash continuations joined."""
+    joined = ""
+    for raw in path.read_text(errors="replace").splitlines():
+        line = raw.strip()
+        if not joined and (not line or line.startswith("#")):
+            continue
+        if line.endswith("\\"):
+            joined += line[:-1] + " "
+            continue
+        yield joined + line
+        joined = ""
+    if joined:
+        yield joined
+
+
+def readable(keys: str) -> str:
+    return keys.replace("Mod4", "Super").replace("Mod1", "Alt")
+
+
+variables: dict[str, str] = {}
+
+
+def expand(text: str) -> str:
+    for name in sorted(variables, key=len, reverse=True):
+        text = text.replace("$" + name, variables[name])
+    return text
+
+
+def strip_flags(words: list[str]) -> list[str]:
+    while words and words[0].startswith("--"):
+        words = words[1:]
+    return words
+
+
+def short(command: str) -> str:
+    command = " ".join(command.split())
+    return command if len(command) <= 90 else command[:87] + "..."
+
+
+def bindings(path: Path):
+    mode = None  # the mode a block belongs to, such as "resize"
+    in_block = False  # inside `bindsym {`
+    for line in lines(path):
+        if line.startswith("set ") and not in_block:
+            parts = line.split(None, 2)
+            if len(parts) == 3:
+                variables[parts[1].lstrip("$")] = expand(parts[2])
+            continue
+        line = expand(line)
+        if in_block:
+            if line == "}":
+                in_block = False
+                continue
+            words = strip_flags(line.split())
+            if len(words) >= 2:
+                yield mode, words[0], " ".join(words[1:])
+            continue
+        m = re.match(r'mode\s+(?:--\S+\s+)*"?([^"{]+?)"?\s*\{$', line)
+        if m:
+            mode = m.group(1)
+            continue
+        if line == "}" and mode:
+            mode = None
+            continue
+        if line.startswith("bindsym"):
+            words = strip_flags(line.split()[1:])
+            if words == ["{"]:
+                in_block = True
+            elif len(words) >= 2:
+                yield mode, words[0], " ".join(words[1:])
+
+
+def main() -> int:
+    seen: dict[tuple, str] = {}  # a later binding of the same keys replaces an earlier one, as in sway
+    for path in [main_config(), *drop_ins()]:
+        if path.is_file():
+            for mode, keys, command in bindings(path):
+                seen[(mode, readable(keys))] = short(command)
+    for (mode, keys), command in seen.items():
+        where = f"[{mode} mode] " if mode else ""
+        print(f"{where}{keys}: {command}")
+    return 0 if seen else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

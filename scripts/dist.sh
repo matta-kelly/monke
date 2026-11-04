@@ -11,6 +11,7 @@ install -Dm755 bin/monke "$root/usr/bin/monke"
 version=${GITHUB_REF_NAME:-$(git describe --tags --always)}
 sed -i "s/^version=dev .*/version=${version#v}/" "$root/usr/bin/monke"
 install -Dm755 libexec/monke-model-fetch "$root/usr/libexec/monke-model-fetch"
+install -Dm755 libexec/monke-keys "$root/usr/libexec/monke-keys"
 install -Dm644 systemd/monke-model.service "$root/usr/lib/systemd/system/monke-model.service"
 install -Dm644 -t "$root/usr/share/monke" share/monke/*.md
 install -Dm644 etc/monke/config "$root/etc/monke/config"

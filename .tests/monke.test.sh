@@ -72,7 +72,10 @@ MONKE_SHARE=$share
 MONKE_MAIN_MODEL=test-main
 MONKE_KEY_FILE=$tmp/key
 MONKE_LOCAL_MODEL=$tmp/model.gguf
+MONKE_KEYS=$tmp/keys
 EOF
+printf '#!/bin/sh\necho "Super+q: kill"\n' >"$tmp/keys"
+chmod +x "$tmp/keys"
 # pi: logs its arguments, whether it got a key, and its system prompt.
 stub pi 'echo "pi key=${FIREWORKS_API_KEY:+set} dir=${PI_CODING_AGENT_DIR:-own}" >>"'"$tmp"'/log"
 while [ $# -gt 0 ]; do [ "$1" = --append-system-prompt ] && cp "$2" "'"$tmp"'/system.md"; shift; done'
@@ -82,6 +85,7 @@ stub nmcli 'echo full'
 
 input="" expect "online, Enter picks local" 0 "+ pi --no-tools --provider local --model local" "$bin" help
 if grep -q "offline" "$tmp/system.md"; then echo "FAIL online local got the wifi offer"; fail=1; else echo "ok   online local has no wifi offer"; fi
+if grep -q "Super+q: kill" "$tmp/system.md"; then echo "ok   local has the key bindings"; else echo "FAIL local has no key bindings"; fail=1; fi
 logged "local starts llama-server on the model" "llama-server -m $tmp/model.gguf"
 logged "local uses its own pi config" "dir=$XDG_STATE_HOME"
 if kill -0 "$(cat "$tmp/server.pid")" 2>/dev/null; then echo "FAIL llama-server left running"; fail=1; else echo "ok   llama-server stops when help ends"; fi
@@ -91,6 +95,7 @@ logged "main gets the key in its environment" "pi key=set dir=own"
 logged "main passes the question" "how do I add an app"
 if grep -q sk-secret "$tmp/log"; then echo "FAIL the key is on pi's command line"; fail=1; else echo "ok   the key is not on pi's command line"; fi
 if grep -q "Sway is the window manager" "$tmp/system.md"; then echo "ok   main has the docs"; else echo "FAIL main has no docs"; fail=1; fi
+if grep -q "Super+q: kill" "$tmp/system.md"; then echo "ok   main has the key bindings"; else echo "FAIL main has no key bindings"; fail=1; fi
 
 stub nmcli 'echo none'
 expect "offline goes local without asking" 0 "offline (none): using the local model" "$bin" help
@@ -105,6 +110,19 @@ echo model >"$tmp/model.gguf"
 expect "a server that dies is reported" 1 "llama-server stopped" "$bin" help
 rm "$XDG_CONFIG_HOME/monke/config"
 stub nmcli
+
+# monke-keys: reads sway's config the way sway layers it
+fake=$tmp/fakeroot
+mkdir -p "$fake/etc/sway/config.d" "$fake/usr/share/sway/config.d" "$tmp/kx/sway/config.d"
+printf 'set $mod Mod4\nset $term foot\n# a comment\nbindsym $mod+Return exec $term\nbindsym $mod+d exec rofi \\\n  -show drun\nmode "resize" {\n  bindsym Escape mode "default"\n}\n' >"$fake/etc/sway/config"
+printf 'bindsym --locked {\n  XF86AudioMute exec pactl mute\n}\n' >"$fake/usr/share/sway/config.d/60-volume.conf"
+printf 'bindsym $mod+o exec shared\n' >"$fake/etc/sway/config.d/70-keys.conf"
+printf 'bindsym $mod+o exec thunar\n' >"$tmp/kx/sway/config.d/70-keys.conf"
+keys=$(MONKE_SWAY_ROOT=$fake XDG_CONFIG_HOME=$tmp/kx "$PWD/libexec/monke-keys")
+for want in "Super+Return: exec foot" "Super+d: exec rofi -show drun" "[resize mode] Escape: mode \"default\"" "XF86AudioMute: exec pactl mute" "Super+o: exec thunar"; do
+  if grep -qF -- "$want" <<<"$keys"; then echo "ok   keys: $want"; else printf 'FAIL keys: no "%s" in:\n%s\n' "$want" "$keys"; fail=1; fi
+done
+if grep -q "exec shared" <<<"$keys"; then echo "FAIL keys: a person's drop-in does not replace the shared one"; fail=1; else echo "ok   keys: a person's drop-in replaces the shared one"; fi
 
 # init
 stub tailscale 'exit 1'

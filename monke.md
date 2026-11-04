@@ -34,6 +34,7 @@ A chat in pi's TUI, with pi's tools off: it answers and tells you what to type, 
 - main: the person's own pi, with the provider and model from the config, and every doc in the system prompt. The key file, when there is one, goes to pi in its environment, never on a command line. With no key file, pi uses its own login
 - local: llama-server runs the model on the laptop while the chat is open, and stops when it ends. pi reaches it through its own config dir (`~/.local/state/monke/pi-local/`), which knows only this model. Its system prompt is short (`share/monke/local.md`): a 3B model on a laptop CPU is slow to read the whole docs
 - the local model: Llama 3.2 3B Instruct, Q4_K_M, 2 GB, pinned by sha256. `monke-model.service` downloads it to `/var/lib/monke/models/` on the first boot that is online, for every person, and retries every 10 minutes until it has it. Boot does not wait for it
+- the key bindings: both models get the person's sway key bindings, read from their config at the start of each chat (`libexec/monke-keys`). It reads the files sway reads, layered the way sway layers them, so a person's own keys are there too
 - the prompts: `share/monke/`, installed in `/usr/share/monke/`
 
 ## Config
