@@ -48,7 +48,6 @@ expect "an unknown command fails" 2 "no command 'nope'" "$bin" nope
 expect "version" 0 "monke dev" "$bin" version
 ln -s "$bin" "$tmp/monkey"
 expect "a symlink names it" 0 "monkey status" "$tmp/monkey"
-expect "MONKE_NAME names it" 0 "matt matt status" env MONKE_NAME="matt matt" "$bin"
 
 # status, update, rollback
 expect "status prints what it runs" 0 "+ rpm-ostree status" "$bin" status

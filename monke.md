@@ -53,7 +53,7 @@ The values, all for `help`:
 
 The image installs `/usr/bin/monke`. A person calls it by another name with a symlink in their dotfiles, and it names itself by the name it was called by.
 - `~/.local/bin/monkey`, a symlink to `/usr/bin/monke`: `monkey help`
-- a name with a space is not one command. A shell function in the person's dotfiles takes it, and sets `MONKE_NAME` so monke names itself the same way: `matt() { [ "${1:-}" = matt ] && shift; MONKE_NAME="matt matt" monke "$@"; }` for `matt matt help`. It works in an interactive shell only
+- Jojo's: `~/.local/bin/mattmatt`, the same kind of link: `mattmatt help`
 
 ## How the image ships it
 

@@ -4,11 +4,10 @@
 #   + cmd   a command that does something
 #   ? cmd   a check: it changes nothing
 #
-# Each person can call it by their own name: a symlink to this file, or a shell function that sets MONKE_NAME (a name
-# with a space, such as "matt matt", cannot be a symlink). It names itself by that name everywhere.
+# Each person can call it by their own name: a symlink to this file. It names itself by the name it was called by.
 set -euo pipefail
 
-me=${MONKE_NAME:-$(basename "$0")}
+me=$(basename "$0")
 version=dev # a release stamps its tag here (scripts/dist.sh)
 
 # Config: the system file from the image, then the person's own file. A later value replaces an earlier one.
