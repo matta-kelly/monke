@@ -202,7 +202,7 @@ help_local() {
 
 # The steps of the docs' setup (Each person), in order. A step that is done is skipped. Each step asks first.
 cmd_init() {
-  local name url email repo
+  local url email repo
   echo "Setup for $(id -un). Each step checks first, and asks before it changes anything."
 
   echo
@@ -238,13 +238,25 @@ cmd_init() {
   echo
   echo "== backup"
   local conf="${XDG_CONFIG_HOME:-$HOME/.config}/restic"
-  name=$(id -un)
   if ! check test -r "$conf/env" -a -r "$conf/password"; then
-    cat <<EOF
-No backup config in $conf. Make these, then run $me init again:
-  - a vault item hetzner-s3-$name: notes = JSON with RESTIC_REPOSITORY, AWS_DEFAULT_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
-  - a vault item restic-$name: notes = a long random password
-  - your dotfiles templates for $conf/env and $conf/password, then: chezmoi apply
+    # The vault items are the ones the person's own restic templates read, never a name guessed here.
+    local src items
+    src=$(chezmoi source-path 2>/dev/null) || src=
+    items=$(grep -rhoE 'rbw "[^"]+"' "$src/dot_config/private_restic" 2>/dev/null | sed 's/rbw "\(.*\)"/\1/' | sort -u)
+    echo "No backup config in $conf. Your dotfiles write it from your vault."
+    if [ -n "$items" ]; then
+      echo "Your dotfiles' restic templates read these vault items. Make each, then run: chezmoi apply, then $me init again"
+      local item
+      while IFS= read -r item; do echo "  - $item"; done <<<"$items"
+    else
+      echo "Your dotfiles have no restic templates yet: add templates for $conf/env and $conf/password, then: chezmoi apply"
+    fi
+    cat <<'EOF'
+Each item is a Secure Note, with its value in the notes:
+  - the S3 item's notes, exactly this shape (placeholder values work while testing; backup needs the real ones):
+    {"RESTIC_REPOSITORY":"s3:https://fsn1.your-objectstorage.com/<bucket>/restic","AWS_DEFAULT_REGION":"fsn1","AWS_ACCESS_KEY_ID":"<key>","AWS_SECRET_ACCESS_KEY":"<secret>"}
+  - the password item's notes: a long random password, and nothing else
+After changing an item in the web vault, run: rbw sync
 EOF
     return
   fi

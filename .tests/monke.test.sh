@@ -130,7 +130,9 @@ expect "init stops off the mesh" 1 "not on the mesh" "$bin" init
 stub tailscale
 mkdir -p "$tmp/src/.git"
 stub chezmoi 'echo '"$tmp"'/src'
-expect "init with no backup config says what to make" 0 "a vault item restic-" "$bin" init
+mkdir -p "$tmp/src/dot_config/private_restic"
+printf '{{ (rbw "restic-pat").notes }}\n' >"$tmp/src/dot_config/private_restic/private_password.tmpl"
+expect "init names the vault items the person's templates read" 0 "  - restic-pat" "$bin" init
 logged "init checks the vault" "rbw unlocked"
 logged "init checks GitHub" "gh auth status"
 mkdir -p "$XDG_CONFIG_HOME/restic"
