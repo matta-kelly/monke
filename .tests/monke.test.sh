@@ -86,19 +86,29 @@ printf '#!/bin/sh\necho "Super+q: kill"\n' >"$tmp/keys"
 chmod +x "$tmp/keys"
 # pi: logs its arguments, whether it got a key, and its system prompt.
 stub pi 'echo "pi key=${FIREWORKS_API_KEY:+set} dir=${PI_CODING_AGENT_DIR:-own}" >>"'"$tmp"'/log"
-while [ $# -gt 0 ]; do [ "$1" = --append-system-prompt ] && cp "$2" "'"$tmp"'/system.md"; shift; done'
+n=0; while [ $# -gt 0 ]; do if [ "$1" = --append-system-prompt ]; then [ $n = 0 ] && : >"'"$tmp"'/system.md"; cat "$2" >>"'"$tmp"'/system.md"; n=1; fi; shift; done'
 stub llama-server 'echo $$ >"'"$tmp"'/server.pid"; exec sleep 30'
 stub curl 'exit 0'
 stub nmcli 'echo full'
 
-input="" expect "online, Enter picks local" 0 "+ pi --no-tools --provider local --model local" "$bin" help
+echo "MACHINE RULES" >"$docs/AGENTS.md"
+mkdir -p "$HOME/.pi/agent" && echo "HER VOICE" >"$HOME/.pi/agent/AGENTS.md"
+input="" expect "online, Enter picks local" 0 "+ pi --provider local --model local" "$bin" help
+logged "local's server can make tool calls" "--jinja"
+for want in "MACHINE RULES" "HER VOICE"; do
+  if grep -q "$want" "$tmp/system.md"; then echo "ok   local loads $want"; else echo "FAIL local does not load $want"; fail=1; fi
+done
 if grep -q "offline" "$tmp/system.md"; then echo "FAIL online local got the wifi offer"; fail=1; else echo "ok   online local has no wifi offer"; fi
 if grep -q "Super+q: kill" "$tmp/system.md"; then echo "ok   local has the key bindings"; else echo "FAIL local has no key bindings"; fail=1; fi
 logged "local starts llama-server on the model" "llama-server -m $tmp/model.gguf"
 logged "local uses its own pi config" "dir=$XDG_STATE_HOME"
 if kill -0 "$(cat "$tmp/server.pid")" 2>/dev/null; then echo "FAIL llama-server left running"; fail=1; else echo "ok   llama-server stops when help ends"; fi
 
-input="m" expect "online, m picks main" 0 "+ pi --no-tools --provider fireworks --model test-main" "$bin" help "how do I add an app"
+input="m" expect "online, m picks main" 0 "+ pi --provider fireworks --model test-main" "$bin" help "how do I add an app"
+for want in "MACHINE RULES" "HER VOICE"; do
+  if grep -q "$want" "$tmp/system.md"; then echo "ok   main loads $want"; else echo "FAIL main does not load $want"; fail=1; fi
+done
+if [ "$(grep -c "MACHINE RULES" "$tmp/system.md")" = 1 ]; then echo "ok   main has the machine rules once, not again among the docs"; else echo "FAIL main has the machine rules twice"; fail=1; fi
 logged "main gets the key in its environment" "pi key=set dir=own"
 logged "main passes the question" "how do I add an app"
 if grep -q sk-secret "$tmp/log"; then echo "FAIL the key is on pi's command line"; fail=1; else echo "ok   the key is not on pi's command line"; fi

@@ -31,7 +31,8 @@ Each command prints what it runs: `+ cmd` for a command that does something, `? 
 
 ## Help
 
-A chat in pi's TUI, with pi's tools off: it answers and tells you what to type, and changes nothing. A question on the command line is its first message.
+A chat in pi's TUI, with pi's tools on: it reads files, runs commands and edits, and says what it will do and asks before changing anything. A question on the command line is its first message.
+- every chat loads two AGENTS.md files, both models: the machine's rules (`/usr/share/doc/monkeyworks/AGENTS.md`, from the image) and the person's own (`~/.pi/agent/AGENTS.md`, from their dotfiles: their voice and preferences). Local runs pi from its own config folder, so monke passes both files itself
 - online (`nmcli networking connectivity` says `full`): it asks local or main. Enter is local
 - offline: local, with no question asked. Local's first reply offers to help get on wifi, so the person can use main. Picked by choice while online, local makes no such offer
 - main: the person's own pi, with the provider and model from the config, and every doc in the system prompt. The key file, when there is one, goes to pi in its environment, never on a command line. With no key file, pi uses its own login
