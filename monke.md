@@ -17,7 +17,10 @@ Built: every command, the config, the local model's download, the release, and t
 
 Each command prints what it runs: `+ cmd` for a command that does something, `? cmd` for a check that changes nothing.
 - `status`: `rpm-ostree status` (the booted, staged and rollback systems), the installed apps, and the app updates there are
-- `update`: `rpm-ostree upgrade`, then `flatpak update`. It says when a new system is staged for the next reboot
+- `update`: asks what to update, in plain words, and Enter is everything. `update everything|system|apps|settings` skips the question
+	- system: `rpm-ostree upgrade`. It says when a new system is staged for the next reboot
+	- apps: `flatpak update`
+	- settings: `chezmoi update`, the person's dotfiles from their repo
 - `rollback`: `rpm-ostree rollback`, so the previous system boots next. Running it again undoes it. Apps are not rolled back
 - `help ["<question>"]`: a chat about this machine, local or main (Help)
 - `init`: the steps of setup (Each person), in order: the mesh, the vault, GitHub, the dotfiles, backup. Each step checks first and skips what is done, and asks before it changes anything

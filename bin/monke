@@ -55,7 +55,7 @@ usage() {
 $me: the front door of this machine. Each command prints the commands it runs.
 
   $me status     what the system and apps are at, and what is staged
-  $me update     update the system and the apps
+  $me update     update everything, or only the system, apps or settings
   $me rollback   go back to the previous system
   $me help ["<question>"]
                  a chat about this machine: local (on this laptop) or main (online)
@@ -76,15 +76,55 @@ cmd_status() {
   run flatpak remote-ls --updates --app --columns=application,version || echo "(none found, or offline)"
 }
 
-# The system first, then the apps. The new system takes over at the next reboot.
+# What to update: everything, the system, the apps, or the settings. With no choice given it asks, and Enter is everything.
 cmd_update() {
+  local pick=${1:-}
+  if [ -z "$pick" ]; then
+    cat <<EOF
+What do you want to update?
+  1) everything: all three below
+  2) system: the base of the machine, the same for everyone. It takes over at your next reboot
+  3) apps: your programs, like Chrome and Spotify
+  4) settings: your dotfiles, the config that makes this machine yours
+EOF
+    read -r -p "[1-4, Enter for everything] " pick
+  fi
+  case "$pick" in
+    "" | 1 | everything | all) update_system && update_apps && update_settings ;;
+    2 | system) update_system ;;
+    3 | apps) update_apps ;;
+    4 | settings | dotfiles) update_settings ;;
+    *)
+      echo "$me update: no choice '$pick'. Use everything, system, apps or settings" >&2
+      exit 2
+      ;;
+  esac
+}
+
+# The new system downloads now and takes over at the next reboot.
+update_system() {
+  echo "== system"
   run rpm-ostree upgrade
-  run flatpak update -y
   local rc=0
   rpm-ostree status --pending-exit-77 >/dev/null || rc=$?
   if [ "$rc" = 77 ]; then
-    echo "A new system is staged. Reboot to use it. To go back after, run: $me rollback"
+    echo "A new system is ready. Reboot to use it. To go back after, run: $me rollback"
   fi
+}
+
+update_apps() {
+  echo "== apps"
+  run flatpak update -y
+}
+
+# The person's dotfiles: pull their repo and apply it.
+update_settings() {
+  echo "== settings"
+  if ! check chezmoi source-path; then
+    echo "No settings repo here yet: $me init sets one up."
+    return 0
+  fi
+  run chezmoi update
 }
 
 # The previous system becomes the default at the next reboot. Running it again undoes it. Apps are not rolled back.

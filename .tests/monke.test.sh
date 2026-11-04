@@ -52,10 +52,18 @@ expect "a symlink names it" 0 "monkey status" "$tmp/monkey"
 # status, update, rollback
 expect "status prints what it runs" 0 "+ rpm-ostree status" "$bin" status
 logged "status lists the apps" "flatpak list --app"
-expect "update: the system, then the apps" 0 "+ flatpak update -y" "$bin" update
-logged "update upgrades the system" "rpm-ostree upgrade"
+input="" expect "update, Enter: everything" 0 "+ chezmoi update" "$bin" update
+logged "everything upgrades the system" "rpm-ostree upgrade"
+logged "everything updates the apps" "flatpak update -y"
+input="3" expect "update, 3: the apps" 0 "+ flatpak update -y" "$bin" update
+if grep -qE "rpm-ostree upgrade|chezmoi update" "$tmp/log"; then echo "FAIL update apps touched more than apps"; fail=1; else echo "ok   update apps touches only apps"; fi
+expect "update settings by name" 0 "+ chezmoi update" "$bin" update settings
+expect "update with a wrong choice fails" 2 "no choice 'nope'" "$bin" update nope
+stub chezmoi 'exit 1'
+expect "settings with no repo says how to get one" 0 "init sets one up" "$bin" update settings
+stub chezmoi
 stub rpm-ostree '[ "$2" = --pending-exit-77 ] && exit 77; exit 0'
-expect "update says when a system is staged" 0 "Reboot to use it" "$bin" update
+expect "update says when a system is staged" 0 "Reboot to use it" "$bin" update system
 stub rpm-ostree
 expect "rollback" 0 "+ rpm-ostree rollback" "$bin" rollback
 
