@@ -137,13 +137,42 @@ update_apps() {
 }
 
 # The person's dotfiles: pull their repo and apply it.
+# chezmoi never gets to ask a question here: a locked vault and files changed on this laptop are both handled first,
+# in plain words.
 update_settings() {
   echo "== settings"
   if ! check chezmoi source-path; then
     echo "No settings repo here yet: $me init sets one up."
     return 0
   fi
-  run chezmoi update
+  if ! check rbw unlocked; then
+    echo "Your vault is locked. Your settings read their passwords and keys from it, so unlock it first."
+    run rbw unlock || {
+      echo "The vault is still locked, so your settings were not updated. Run $me update settings to try again."
+      return 0
+    }
+  fi
+  run chezmoi git -- pull --ff-only
+  # Files changed on this laptop since chezmoi last wrote them: the first column of `chezmoi status`.
+  local changed answer file targets=()
+  changed=$(chezmoi status 2>/dev/null | awk 'substr($0, 1, 1) != " " { print substr($0, 4) }')
+  if [ -z "$changed" ]; then
+    run chezmoi apply --force
+    return
+  fi
+  echo "These settings were changed on this laptop since your last update:"
+  while IFS= read -r file; do echo "  ~/$file"; done <<<"$changed"
+  read -r -p "Replace them with the update, or keep yours? [r = replace, Enter = keep yours] " answer
+  if [[ $answer == [rR]* ]]; then
+    run chezmoi apply --force
+    return
+  fi
+  # Keep yours: apply every other file, and leave these as they are.
+  while IFS= read -r file; do
+    grep -qxF -- "$file" <<<"$changed" || targets+=("$HOME/$file")
+  done < <(chezmoi managed --include=files,symlinks)
+  if [ ${#targets[@]} -gt 0 ]; then run chezmoi apply --force "${targets[@]}"; fi
+  echo "Kept yours. Everything else is updated."
 }
 
 # The previous system becomes the default at the next reboot. Running it again undoes it. Apps are not rolled back.

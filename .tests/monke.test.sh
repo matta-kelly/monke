@@ -52,12 +52,24 @@ expect "a symlink names it" 0 "monkey status" "$tmp/monkey"
 # status, update, rollback
 expect "status prints what it runs" 0 "+ rpm-ostree status" "$bin" status
 logged "status lists the apps" "flatpak list --app"
-input="" expect "update, Enter: everything" 0 "+ chezmoi update" "$bin" update
+input="" expect "update, Enter: everything" 0 "+ chezmoi apply --force" "$bin" update
 logged "everything upgrades the system" "rpm-ostree upgrade"
 logged "everything updates the apps" "flatpak update -y"
 input="3" expect "update, 3: the apps" 0 "+ flatpak update -y" "$bin" update
-if grep -qE "rpm-ostree upgrade|chezmoi update" "$tmp/log"; then echo "FAIL update apps touched more than apps"; fail=1; else echo "ok   update apps touches only apps"; fi
-expect "update settings by name" 0 "+ chezmoi update" "$bin" update settings
+if grep -qE "rpm-ostree upgrade|chezmoi " "$tmp/log"; then echo "FAIL update apps touched more than apps"; fail=1; else echo "ok   update apps touches only apps"; fi
+expect "update settings by name" 0 "+ chezmoi apply --force" "$bin" update settings
+logged "settings pulls the repo" "chezmoi git -- pull --ff-only"
+# a file changed on this laptop: chezmoi's status shows it in the first column
+stub chezmoi 'case "$1" in status) echo "M  .config/foot/foot.ini";; managed) printf ".config/foot/foot.ini\n.bashrc.d/aliases.sh\n";; esac'
+input="" expect "a changed file: Enter keeps hers" 0 "Kept yours" "$bin" update settings
+logged "keeping hers applies the others" "chezmoi apply --force $HOME/.bashrc.d/aliases.sh"
+if grep -q "apply --force.*foot.ini" "$tmp/log"; then echo "FAIL keeping hers still wrote her file"; fail=1; else echo "ok   keeping hers leaves her file alone"; fi
+input="r" expect "a changed file: r replaces it" 0 "+ chezmoi apply --force" "$bin" update settings
+stub chezmoi
+stub rbw '[ "$1" = unlocked ] && exit 1; exit 0'
+expect "a locked vault is unlocked first, in plain words" 0 "Your vault is locked" "$bin" update settings
+logged "it runs rbw unlock" "rbw unlock"
+stub rbw
 expect "update with a wrong choice fails" 2 "no choice 'nope'" "$bin" update nope
 stub chezmoi 'exit 1'
 expect "settings with no repo says how to get one" 0 "init sets one up" "$bin" update settings

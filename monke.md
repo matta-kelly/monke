@@ -20,7 +20,9 @@ Each command prints what it runs: `+ cmd` for a command that does something, `? 
 - `update`: asks what to update, in plain words, and Enter is everything. `update everything|system|apps|settings` skips the question
 	- system: `rpm-ostree upgrade`. It says when a new system is staged for the next reboot
 	- apps: `flatpak update`
-	- settings: `chezmoi update`, the person's dotfiles from their repo
+	- settings: the person's dotfiles from their repo, with no chezmoi question ever shown
+		- a locked vault: it says so in plain words and runs `rbw unlock` first, since the dotfiles read secrets from it
+		- files changed on this laptop since chezmoi last wrote them: it lists them and asks, in plain words, whether to replace them or keep hers. Keeping hers updates every other file
 - `rollback`: `rpm-ostree rollback`, so the previous system boots next. Running it again undoes it. Apps are not rolled back. Then it offers a restart
 - `restart`: `systemctl reboot`, after asking. `update` offers it at the end when a new system is staged
 - `help ["<question>"]`: a chat about this machine, local or main (Help)
