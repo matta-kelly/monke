@@ -129,6 +129,16 @@ expect "a server that dies is reported" 1 "llama-server stopped" "$bin" help
 rm "$XDG_CONFIG_HOME/monke/config"
 stub nmcli
 
+# wtf
+printf '#!/bin/sh\nif [ "$1" = --main ]; then echo "  close the window  Super+q"; else echo "Super+q: kill"; echo "Super+o: exec thunar"; fi\n' >"$tmp/keys"
+chmod +x "$tmp/keys"
+printf 'MONKE_KEYS=%s\nMONKE_WTF_MESSAGE="made with love"\n' "$tmp/keys" >"$XDG_CONFIG_HOME/monke/config"
+expect "wtf shows the main keys" 0 "close the window  Super+q" "$bin" wtf
+expect "wtf shows the person's message" 0 "made with love" "$bin" wtf
+expect "wtf all shows every key" 0 "Super+o: exec thunar" "$bin" wtf all
+expect "wtf points to help" 0 "help, and ask" "$bin" wtf
+rm "$XDG_CONFIG_HOME/monke/config"
+
 # monke-keys: reads sway's config the way sway layers it
 fake=$tmp/fakeroot
 mkdir -p "$fake/etc/sway/config.d" "$fake/usr/share/sway/config.d" "$tmp/kx/sway/config.d"

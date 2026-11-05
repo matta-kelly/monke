@@ -19,6 +19,7 @@ MONKE_MAIN_MODEL=
 MONKE_KEY_FILE=
 MONKE_LOCAL_MODEL=
 MONKE_LOCAL_PORT=8765
+MONKE_WTF_MESSAGE=
 for file in /etc/monke/config "${XDG_CONFIG_HOME:-$HOME/.config}/monke/config"; do
   if [ -r "$file" ]; then
     # shellcheck source=/dev/null
@@ -60,6 +61,7 @@ $me: the front door of this machine. Each command prints the commands it runs.
   $me help ["<question>"]
                  a chat about this machine: local (on this laptop) or main (online)
   $me init       set up a new person, step by step
+  $me wtf        your main keys at a glance; "$me wtf all" for every key
   $me version    the version of $me
 
 The docs: $MONKE_DOCS
@@ -331,11 +333,25 @@ EOF
   echo "Done. Next: $me status. To restore a file, see backup in $MONKE_DOCS."
 }
 
+# The main keys at a glance, read live from the person's sway config. "all": every key.
+cmd_wtf() {
+  echo "$me wtf: your keys at a glance. Super is the Windows key."
+  [ -z "$MONKE_WTF_MESSAGE" ] || printf '\n%s\n' "$MONKE_WTF_MESSAGE"
+  echo
+  if [ "${1:-}" = all ]; then
+    "$MONKE_KEYS" || die "no sway keys found"
+  else
+    "$MONKE_KEYS" --main || die "no sway keys found"
+    printf '\nEvery key: %s wtf all\n' "$me"
+  fi
+  printf 'Stuck? %s help, and ask. Updates: %s update\n' "$me" "$me"
+}
+
 cmd_version() { echo "$me $version"; }
 
 case "${1:-}" in
   "" | -h | --help) usage ;;
-  status | update | rollback | help | init | version)
+  status | update | rollback | help | init | wtf | version)
     cmd=$1
     shift
     "cmd_$cmd" "$@"

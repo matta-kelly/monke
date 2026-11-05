@@ -27,6 +27,7 @@ Each command prints what it runs: `+ cmd` for a command that does something, `? 
 	- the mesh is the machine's step: off the mesh, `init` stops
 	- it does not make the vault items for backup: it names the two items to make, then stops
 	- for backup it creates the repository and starts the first backup
+- `wtf`: the main keys at a glance, named in plain words and read live from the person's sway config, so a moved key shows where it is now. `wtf all` lists every key. A person's `MONKE_WTF_MESSAGE` shows under its first line
 - `version`
 
 ## Help

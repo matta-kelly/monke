@@ -1,5 +1,6 @@
 #!/usr/bin/python3
-"""Print the person's sway key bindings, one per line: the keys, then what they do.
+"""Print the person's sway key bindings, one per line: the keys, then what they do. With --main, only the main ones,
+named in plain words.
 
 It reads the config files sway reads, the way sway layers them: the main config, then the drop-ins from
 /usr/share/sway/config.d, /etc/sway/config.d and ~/.config/sway/config.d, where a file in a later folder replaces one
@@ -102,15 +103,43 @@ def bindings(path: Path):
                 yield mode, words[0], " ".join(words[1:])
 
 
+# The main keys: what each does, in plain words, and the command it runs. Found by the command, not the key, so a
+# person who moves a key sees their own key.
+MAIN = [
+    ("open a terminal", r"^exec (foot|\S*/foot)\b"),
+    ("open the app launcher", r"^exec rofi\b.*-show (drun|combi)"),
+    ("close the window", r"^kill$"),
+    ("fullscreen, on and off", r"^fullscreen$"),
+    ("go to workspace 1 (2 to 9 the same way)", r"^workspace number 1$"),
+    ("send the window to workspace 1", r"^move container to workspace number 1$"),
+    ("move between windows", r"^focus (left|right|up|down)$"),
+    ("screenshot: drag an area", r"grim -g"),
+    ("screenshot: the whole screen", r"^exec .*\bgrim (?!-g)"),
+    ("lock the screen", r"lock-session|swaylock"),
+    ("reload settings, after a change", r"^reload$"),
+    ("log out", r"swaynag.*exit|^exit$"),
+]
+
+
 def main() -> int:
     seen: dict[tuple, str] = {}  # a later binding of the same keys replaces an earlier one, as in sway
     for path in [main_config(), *drop_ins()]:
         if path.is_file():
             for mode, keys, command in bindings(path):
-                seen[(mode, readable(keys))] = short(command)
+                seen[(mode, readable(keys))] = " ".join(command.split())
+    if "--main" in sys.argv[1:]:
+        width = max(len(label) for label, _ in MAIN)
+        for label, pattern in MAIN:
+            keys = [k for (mode, k), command in seen.items() if not mode and re.search(pattern, command)]
+            arrows = [k for k in keys if k.split("+")[-1] in ("Left", "Right", "Up", "Down")]
+            if label == "move between windows" and arrows:
+                keys = [arrows[0].rsplit("+", 1)[0] + "+arrows"]  # four keys, said as one
+            if keys:
+                print(f"  {label:<{width}}  {'  or  '.join(keys[:2])}")
+        return 0 if seen else 1
     for (mode, keys), command in seen.items():
         where = f"[{mode} mode] " if mode else ""
-        print(f"{where}{keys}: {command}")
+        print(f"{where}{keys}: {short(command)}")
     return 0 if seen else 1
 
 

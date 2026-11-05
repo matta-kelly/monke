@@ -11,3 +11,6 @@ MONKE_KEY_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/monke/key"
 # monke-model.service downloads it on the first boot that is online.
 MONKE_LOCAL_MODEL=/var/lib/monke/models/Llama-3.2-3B-Instruct-Q4_K_M.gguf
 MONKE_LOCAL_PORT=8765
+
+# wtf: a line shown under its first line. A person sets their own in ~/.config/monke/config
+MONKE_WTF_MESSAGE=
