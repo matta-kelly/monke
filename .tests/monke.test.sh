@@ -63,9 +63,14 @@ stub chezmoi 'exit 1'
 expect "settings with no repo says how to get one" 0 "init sets one up" "$bin" update settings
 stub chezmoi
 stub rpm-ostree '[ "$2" = --pending-exit-77 ] && exit 77; exit 0'
-expect "update says when a system is staged" 0 "Reboot to use it" "$bin" update system
+input="y" expect "update says when a system is staged" 0 "takes over when you restart" "$bin" update system
+logged "a staged system: yes restarts" "systemctl reboot"
+input="n" expect "a staged system: no waits" 0 "Restart when you are ready" "$bin" update system
+if grep -q "systemctl reboot" "$tmp/log"; then echo "FAIL no still restarted"; fail=1; else echo "ok   no does not restart"; fi
 stub rpm-ostree
-expect "rollback" 0 "+ rpm-ostree rollback" "$bin" rollback
+input="n" expect "rollback" 0 "+ rpm-ostree rollback" "$bin" rollback
+input="" expect "restart, Enter: restarts" 0 "+ systemctl reboot" "$bin" restart
+input="n" expect "restart, no: does not" 0 "Not now" "$bin" restart
 
 # help
 share=$PWD/share/monke

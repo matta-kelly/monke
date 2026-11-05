@@ -58,6 +58,7 @@ $me: the front door of this machine. Each command prints the commands it runs.
   $me status     what the system and apps are at, and what is staged
   $me update     update everything, or only the system, apps or settings
   $me rollback   go back to the previous system
+  $me restart    restart the machine, after asking
   $me help ["<question>"]
                  a chat about this machine: local (on this laptop) or main (online)
   $me init       set up a new person, step by step
@@ -101,6 +102,12 @@ EOF
       exit 2
       ;;
   esac
+  # A new system only takes over at a restart, so offer one at the end, after the apps and settings.
+  if [ "${restart_due:-}" = yes ]; then
+    echo
+    echo "The new system takes over when you restart."
+    cmd_restart
+  fi
 }
 
 # The new system downloads now and takes over at the next reboot.
@@ -110,7 +117,17 @@ update_system() {
   local rc=0
   rpm-ostree status --pending-exit-77 >/dev/null || rc=$?
   if [ "$rc" = 77 ]; then
-    echo "A new system is ready. Reboot to use it. To go back after, run: $me rollback"
+    echo "A new system is ready. To go back after the restart, run: $me rollback"
+    restart_due=yes
+  fi
+}
+
+# Restart the machine, after asking. Open work is lost, so it asks first.
+cmd_restart() {
+  if ask "Restart now? Save your work first."; then
+    run systemctl reboot
+  else
+    echo "Not now. Restart when you are ready: $me restart"
   fi
 }
 
@@ -132,7 +149,8 @@ update_settings() {
 # The previous system becomes the default at the next reboot. Running it again undoes it. Apps are not rolled back.
 cmd_rollback() {
   run rpm-ostree rollback
-  echo "Reboot to use the previous system. To undo, run $me rollback again."
+  echo "The previous system takes over when you restart. To undo, run $me rollback again."
+  cmd_restart
 }
 
 # A chat in pi about this machine, with pi's tools on: it reads, runs and edits, asking first as AGENTS.md says.
@@ -351,7 +369,7 @@ cmd_version() { echo "$me $version"; }
 
 case "${1:-}" in
   "" | -h | --help) usage ;;
-  status | update | rollback | help | init | wtf | version)
+  status | update | rollback | restart | help | init | wtf | version)
     cmd=$1
     shift
     "cmd_$cmd" "$@"

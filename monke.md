@@ -21,7 +21,8 @@ Each command prints what it runs: `+ cmd` for a command that does something, `? 
 	- system: `rpm-ostree upgrade`. It says when a new system is staged for the next reboot
 	- apps: `flatpak update`
 	- settings: `chezmoi update`, the person's dotfiles from their repo
-- `rollback`: `rpm-ostree rollback`, so the previous system boots next. Running it again undoes it. Apps are not rolled back
+- `rollback`: `rpm-ostree rollback`, so the previous system boots next. Running it again undoes it. Apps are not rolled back. Then it offers a restart
+- `restart`: `systemctl reboot`, after asking. `update` offers it at the end when a new system is staged
 - `help ["<question>"]`: a chat about this machine, local or main (Help)
 - `init`: the steps of setup (Each person), in order: the mesh, the vault, GitHub, the dotfiles, backup. Each step checks first and skips what is done, and asks before it changes anything
 	- the mesh is the machine's step: off the mesh, `init` stops
