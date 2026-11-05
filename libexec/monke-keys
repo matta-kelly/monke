@@ -108,6 +108,7 @@ def bindings(path: Path):
 MAIN = [
     ("open a terminal", r"^exec (foot|\S*/foot)\b"),
     ("open the app launcher", r"^exec rofi\b.*-show (drun|combi)"),
+    ("open your files", r"^exec (thunar|nautilus|pcmanfm)\b"),
     ("close the window", r"^kill$"),
     ("fullscreen, on and off", r"^fullscreen$"),
     ("go to workspace 1 (2 to 9 the same way)", r"^workspace number 1$"),
