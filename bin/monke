@@ -241,7 +241,7 @@ help_main() {
     keys_section
     printf '\n# The docs\n\n'
     for file in "$MONKE_DOCS"/*.md; do
-      [ -r "$file" ] && [ "${file##*/}" != AGENTS.md ] || continue
+      if [ ! -r "$file" ] || [ "${file##*/}" = AGENTS.md ]; then continue; fi
       printf '=== %s ===\n%s\n\n' "${file##*/}" "$(<"$file")"
     done
   } >"$sys"

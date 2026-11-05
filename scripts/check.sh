@@ -13,12 +13,10 @@ cd "$(dirname "$0")/.."
 # 1. The sets, cheapest first. The first failure ends the run.
 sets="lint shellcheck test"
 
-# 2. Each set's commands. Each tool runs where it is (the pipeline has Node and shellcheck), or else in its pinned image
-# (the justfile).
+# 2. Each set's commands. The lint runs where Node is, or else in its pinned image (the justfile). shellcheck always runs
+# in its pinned image, here and in the pipeline, so both see the same version and the same findings.
 set_lint() { if command -v npm >/dev/null; then npm run --silent lint; else just lint; fi; }
-set_shellcheck() {
-  if command -v shellcheck >/dev/null; then shellcheck bin/monke libexec/monke-model-fetch scripts/*.sh .tests/*.sh; else just shellcheck; fi
-}
+set_shellcheck() { just shellcheck; }
 set_test() { .tests/monke.test.sh; }
 
 # 3. The sets a changed file needs. A file no rule names needs every set, so a missing rule runs more, never less.
