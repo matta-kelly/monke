@@ -1,7 +1,7 @@
 ---
 type: component
 description: "monke, the CLI of Monkeyworks: one bash script that wraps the machine's own tools and prints each command it runs. Its commands, help's chat with a local or a main model, its config, how each person names it, and how the image ships it. Read before changing the CLI, help's models, or how the image ships it."
-status: planned
+status: running
 ---
 monke: the front door of [[monkeyworks]]. A bash script that wraps the tools the machine already has, and prints each command before it runs it, so the user sees what it does and can do it by hand.
 - Commands: what each one does
@@ -10,7 +10,7 @@ monke: the front door of [[monkeyworks]]. A bash script that wraps the tools the
 - Names: how each person calls it by their own name
 - How the image ships it
 
-Built: every command, the config, the local model's download, the release, and the tests. Run on a real machine: `help` on the local path, on the E480. Not yet run for real: `help` on main, `init`.
+Built: every command, the config, the local model's download, the release, and the tests. Run on real machines (babyboo, the E480): `status`, `update`, `restart`, `wtf`, `help` on local, and `init`'s vault and dotfiles steps. Not yet run for real: `help` on main (no real key yet), `help` on local with tools on and the real 3B model, and `init`'s backup steps.
 
 ---
 ## Commands
